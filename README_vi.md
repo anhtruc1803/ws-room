@@ -91,7 +91,9 @@ Lệnh này chạy:
 
 ## Hướng dẫn Deploy lên Production
 
-Đối với môi trường thực tế, bạn nên Build cho ứng dụng Next.js của mình và chạy các cấu thành hệ thống như các Service riêng rẽ lẻ tẻ để dễ dàng Scale ngang.
+**Để xem toàn bộ hướng dẫn từng bước cài đặt hệ thống lên Server Ubuntu 22.04 LTS (bao gồm Cấu hình Nginx, PM2, Redis, Postgres), vui lòng đọc [Hướng dẫn Cài Đặt và Triển Khai trên Ubuntu 22.04](DEPLOYMENT_vi.md).**
+
+Đối với môi trường thực tế tự chọn, bạn nên Build cho ứng dụng Next.js của mình và chạy các cấu thành hệ thống như các Service riêng rẽ lẻ tẻ để dễ dàng Scale ngang.
 
 **Build Mã nguồn:**
 ```bash

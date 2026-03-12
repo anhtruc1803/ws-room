@@ -89,7 +89,9 @@ This starts:
 
 ## Production Deployment
 
-For production, you should build the Next.js app and run the services independently to scale them horizontally.
+**For a comprehensive step-by-step production setup on Ubuntu 22.04 LTS (with Nginx, PM2, Redis, Postgres), please read the [Ubuntu 22.04 Deployment Guide](DEPLOYMENT.md).**
+
+If you prefer to deploy manually, you should build the Next.js app and run the services independently to scale them horizontally.
 
 **Build:**
 ```bash
