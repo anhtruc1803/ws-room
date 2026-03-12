@@ -1,0 +1,159 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================
+// ENUMS
+// ============================================================
+
+enum RoomStatus {
+  active
+  locked
+  deleted
+}
+
+enum SecurityLevel {
+  open       // anyone with link can join
+  password   // requires password to join
+}
+
+enum ParticipantRole {
+  owner      // room creator
+  member     // regular participant
+}
+
+enum MessageType {
+  text
+  system      // join/leave/room events
+  attachment  // file upload
+}
+
+// ============================================================
+// ROOM — ephemeral incident room
+// ============================================================
+
+model Room {
+  id            String        @id @default(cuid())
+  roomCode      String        @unique @db.VarChar(8)
+  title         String        @db.VarChar(200)
+  description   String?       @db.Text
+  status        RoomStatus    @default(active)
+  securityLevel SecurityLevel @default(open)
+  passwordHash  String?       // bcrypt hash, only if securityLevel = password
+  createdByName String        @db.VarChar(100) // display name of creator
+
+  expiresAt     DateTime      // when room auto-locks
+  resolvedAt    DateTime?     // when incident was marked resolved
+  deleteAt      DateTime?     // scheduled hard deletion time
+
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  // Relations
+  participants  ParticipantSession[]
+  messages      Message[]
+  attachments   Attachment[]
+  auditLogs     AuditLog[]
+
+  @@index([status, expiresAt])  // for expiration job queries
+  @@index([status, deleteAt])   // for deletion job queries
+  @@map("rooms")
+}
+
+// ============================================================
+// PARTICIPANT SESSION — ephemeral user in a room
+// ============================================================
+
+model ParticipantSession {
+  id           String          @id @default(cuid())
+  roomId       String
+  displayName  String          @db.VarChar(100)
+  role         ParticipantRole @default(member)
+  sessionToken String          @unique // used for auth within room
+  isActive     Boolean         @default(true)
+
+  joinedAt     DateTime        @default(now())
+  leftAt       DateTime?
+
+  // Relations
+  room         Room            @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  messages     Message[]
+  auditLogs    AuditLog[]
+
+  @@index([roomId, isActive])
+  @@index([sessionToken])
+  @@map("participant_sessions")
+}
+
+// ============================================================
+// MESSAGE — chat message in a room
+// ============================================================
+
+model Message {
+  id              String      @id @default(cuid())
+  roomId          String
+  senderSessionId String?     // null for system messages
+  type            MessageType @default(text)
+  content         String      @db.Text
+
+  createdAt       DateTime    @default(now())
+
+  // Relations
+  room            Room        @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  sender          ParticipantSession? @relation(fields: [senderSessionId], references: [id], onDelete: SetNull)
+  attachment      Attachment?
+
+  @@index([roomId, createdAt])
+  @@map("messages")
+}
+
+// ============================================================
+// ATTACHMENT — file uploaded to a room
+// ============================================================
+
+model Attachment {
+  id          String   @id @default(cuid())
+  roomId      String
+  messageId   String   @unique // one attachment per message
+  filename    String   @db.VarChar(255)
+  mimeType    String   @db.VarChar(100)
+  size        Int      // bytes
+  storageKey  String   // S3 object key
+
+  expiresAt   DateTime // signed URL expiry, also deletion schedule
+  createdAt   DateTime @default(now())
+
+  // Relations
+  room        Room     @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  message     Message  @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  @@index([roomId])
+  @@index([expiresAt]) // for cleanup job
+  @@map("attachments")
+}
+
+// ============================================================
+// AUDIT LOG — track important actions
+// ============================================================
+
+model AuditLog {
+  id             String   @id @default(cuid())
+  roomId         String
+  actorSessionId String?  // null for system actions
+  action         String   @db.VarChar(50) // e.g. "room.created", "user.joined", "file.uploaded"
+  metadata       Json?    // additional context
+
+  createdAt      DateTime @default(now())
+
+  // Relations
+  room           Room     @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  actor          ParticipantSession? @relation(fields: [actorSessionId], references: [id], onDelete: SetNull)
+
+  @@index([roomId, createdAt])
+  @@map("audit_logs")
+}
