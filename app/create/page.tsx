@@ -66,7 +66,7 @@ export default function CreateRoomPage() {
         participantId: result.room.id,
       });
 
-      router.push(`/room/${result.room.roomCode}`);
+      router.push(`/room-created?code=${result.room.roomCode}&title=${encodeURIComponent(title.trim())}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : t.createRoom.errorCreateFailed);
     } finally {

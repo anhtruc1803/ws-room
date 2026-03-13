@@ -88,7 +88,9 @@ const vi: TranslationKeys = {
     ended: "Đã kết thúc",
     endRoom: "Kết thúc",
     copyInviteLink: "Sao chép link mời",
+    linkCopied: "Đã sao chép link mời!",
     expired: "Hết hạn",
+    roomInfo: "Thông tin phòng",
   },
 
   // ── Khu vực chat ──────────────────────────────────────────
@@ -99,6 +101,16 @@ const vi: TranslationKeys = {
     uploadFile: "Tải file lên",
     fileTooLarge: "File quá lớn. Kích thước tối đa là {size}MB",
     uploadFailed: "Tải file thất bại",
+    uploadSuccess: "Tải file thành công",
+    newMessages: "tin nhắn mới",
+    dragDropHint: "Thả file vào đây để tải lên",
+    typing: "đang gõ...",
+    typingMultiple: "đang gõ...",
+    messageCopied: "Đã sao chép tin nhắn!",
+    copyMessage: "Sao chép tin nhắn",
+    replyTo: "Trả lời",
+    replying: "Đang trả lời",
+    cancelReply: "Hủy trả lời",
   },
 
   // ── Thành viên ────────────────────────────────────────────
@@ -106,6 +118,46 @@ const vi: TranslationKeys = {
     title: "Thành viên",
     you: "(bạn)",
     owner: "CHỦ PHÒNG",
+  },
+
+  // ── Xác nhận ──────────────────────────────────────────────
+  confirmDialog: {
+    endRoomTitle: "Kết thúc phòng?",
+    endRoomMessage: "Tất cả thành viên sẽ bị ngắt kết nối. Dữ liệu sẽ bị xóa sau 30 phút. Không thể hoàn tác.",
+    endRoomConfirm: "Kết thúc",
+    cancel: "Hủy",
+  },
+
+  // ── Thông tin phòng ──────────────────────────────────────
+  roomInfo: {
+    title: "Thông tin phòng",
+    description: "Mô tả",
+    noDescription: "Không có mô tả",
+    createdBy: "Tạo bởi",
+    createdAt: "Thời gian tạo",
+    expiresAt: "Hết hạn lúc",
+    inviteLink: "Link mời",
+    copyLink: "Sao chép link",
+    copied: "Đã sao chép!",
+    status: "Trạng thái",
+    active: "Đang hoạt động",
+    locked: "Đã khóa",
+  },
+
+  // ── Âm thanh ──────────────────────────────────────────────
+  sound: {
+    enable: "Bật âm thanh thông báo",
+    disable: "Tắt âm thanh thông báo",
+  },
+
+  // ── Tạo phòng thành công ──────────────────────────────────
+  roomCreated: {
+    title: "Đã tạo phòng!",
+    subtitle: "Chia sẻ mã này cho đội ngũ để tham gia",
+    copyCode: "Sao chép mã",
+    codeCopied: "Đã sao chép mã!",
+    copyLink: "Sao chép link mời",
+    enterRoom: "Vào phòng",
   },
 };
 

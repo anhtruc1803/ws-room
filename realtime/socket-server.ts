@@ -250,6 +250,16 @@ export function initSocketServer(httpServer: HttpServer): Server {
       }
     );
 
+    // ── Typing Indicator ─────────────────────────────────
+    socket.on("typing", () => {
+      const s = socket as AuthenticatedSocket;
+      if (!s.data?.sessionId) return;
+      const socketRoom = `room:${s.data.roomCode}`;
+      socket.to(socketRoom).emit("user-typing", {
+        displayName: s.data.displayName,
+      });
+    });
+
     // ── Leave Room ────────────────────────────────────────
     socket.on("leave-room", async () => {
       await handleLeave(socket as AuthenticatedSocket);

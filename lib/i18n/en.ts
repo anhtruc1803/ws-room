@@ -86,7 +86,9 @@ const en = {
     ended: "Ended",
     endRoom: "End Room",
     copyInviteLink: "Copy invite link",
+    linkCopied: "Invite link copied!",
     expired: "Expired",
+    roomInfo: "Room Info",
   },
 
   // ── Chat area ───────────────────────────────────────────
@@ -97,6 +99,16 @@ const en = {
     uploadFile: "Upload file",
     fileTooLarge: "File too large. Max size is {size}MB",
     uploadFailed: "Upload failed",
+    uploadSuccess: "File uploaded successfully",
+    newMessages: "new messages",
+    dragDropHint: "Drop files here to upload",
+    typing: "is typing...",
+    typingMultiple: "are typing...",
+    messageCopied: "Message copied!",
+    copyMessage: "Copy message",
+    replyTo: "Reply to",
+    replying: "Replying to",
+    cancelReply: "Cancel reply",
   },
 
   // ── Participants ────────────────────────────────────────
@@ -104,6 +116,46 @@ const en = {
     title: "Participants",
     you: "(you)",
     owner: "OWNER",
+  },
+
+  // ── Confirm dialog ──────────────────────────────────────
+  confirmDialog: {
+    endRoomTitle: "End Room?",
+    endRoomMessage: "All participants will be disconnected. Data will be deleted after 30 minutes. This cannot be undone.",
+    endRoomConfirm: "End Room",
+    cancel: "Cancel",
+  },
+
+  // ── Room info modal ─────────────────────────────────────
+  roomInfo: {
+    title: "Room Information",
+    description: "Description",
+    noDescription: "No description",
+    createdBy: "Created by",
+    createdAt: "Created at",
+    expiresAt: "Expires at",
+    inviteLink: "Invite Link",
+    copyLink: "Copy Link",
+    copied: "Copied!",
+    status: "Status",
+    active: "Active",
+    locked: "Locked",
+  },
+
+  // ── Sound ───────────────────────────────────────────────
+  sound: {
+    enable: "Enable notification sounds",
+    disable: "Mute notification sounds",
+  },
+
+  // ── Success page ────────────────────────────────────────
+  roomCreated: {
+    title: "Room Created!",
+    subtitle: "Share this code with your team to join",
+    copyCode: "Copy Code",
+    codeCopied: "Code copied!",
+    copyLink: "Copy Invite Link",
+    enterRoom: "Enter Room",
   },
 };
 

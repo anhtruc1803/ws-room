@@ -7,8 +7,11 @@ import { ChatArea } from "@/components/room/ChatArea";
 import { MessageInput } from "@/components/room/MessageInput";
 import { ParticipantList } from "@/components/room/ParticipantList";
 import { WatermarkOverlay } from "@/components/room/WatermarkOverlay";
+import { RoomInfoModal } from "@/components/room/RoomInfoModal";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { useSocket } from "@/hooks/useSocket";
 import { useTranslation } from "@/hooks/useTranslation";
+import { useToast } from "@/hooks/useToast";
 import { getSession } from "@/lib/session-store";
 import {
   getRoomInfo,
@@ -26,14 +29,25 @@ export default function RoomPage({
   const { code } = use(params);
   const router = useRouter();
   const { t } = useTranslation();
+  const { toast } = useToast();
 
   // State
   const [room, setRoom] = useState<RoomData | null>(null);
   const [messages, setMessages] = useState<MessageData[]>([]);
   const [participants, setParticipants] = useState<ParticipantData[]>([]);
   const [showParticipants, setShowParticipants] = useState(false);
+  const [showRoomInfo, setShowRoomInfo] = useState(false);
+  const [showEndConfirm, setShowEndConfirm] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [replyTo, setReplyTo] = useState<MessageData | null>(null);
+  const [typingUsers, setTypingUsers] = useState<string[]>([]);
+  const [soundEnabled, setSoundEnabled] = useState(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("war-room-sound") !== "false";
+    }
+    return true;
+  });
 
   // Session
   const session = typeof window !== "undefined" ? getSession() : null;
@@ -42,10 +56,43 @@ export default function RoomPage({
   const displayName = session?.displayName || "";
   const isOwner = session?.role === "owner";
 
+  // Sound notification
+  const playNotificationSound = useCallback(() => {
+    if (!soundEnabled) return;
+    try {
+      const ctx = new AudioContext();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.frequency.value = 800;
+      gain.gain.value = 0.1;
+      osc.start();
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.15);
+      osc.stop(ctx.currentTime + 0.15);
+    } catch {
+      // Audio not supported
+    }
+  }, [soundEnabled]);
+
+  const toggleSound = () => {
+    const next = !soundEnabled;
+    setSoundEnabled(next);
+    localStorage.setItem("war-room-sound", String(next));
+  };
+
   // Socket callbacks
   const onMessage = useCallback((msg: MessageData) => {
-    setMessages((prev) => [...prev, msg]);
-  }, []);
+    setMessages((prev) => {
+      // Prevent duplicates
+      if (prev.find((m) => m.id === msg.id)) return prev;
+      return [...prev, msg];
+    });
+    // Play sound for messages from others
+    if (msg.senderSessionId !== participantId && msg.type !== "system") {
+      playNotificationSound();
+    }
+  }, [participantId, playNotificationSound]);
 
   const onUserJoined = useCallback((p: ParticipantData) => {
     setParticipants((prev) => {
@@ -63,13 +110,23 @@ export default function RoomPage({
   }, []);
 
   // Socket connection
-  const { connected, sendMessage } = useSocket({
+  const { connected, sendMessage, emitTyping } = useSocket({
     token: sessionToken,
     roomCode: code,
     onMessage,
     onUserJoined,
     onUserLeft,
     onRoomEnded,
+    onTyping: useCallback((name: string) => {
+      setTypingUsers((prev) => {
+        if (prev.includes(name)) return prev;
+        return [...prev, name];
+      });
+      // Remove after 3s
+      setTimeout(() => {
+        setTypingUsers((prev) => prev.filter((n) => n !== name));
+      }, 3000);
+    }, []),
   });
 
   // Load initial room data
@@ -97,25 +154,67 @@ export default function RoomPage({
 
   // End room handler
   const handleEndRoom = async () => {
-    if (!confirm(t.room.confirmEndRoom)) return;
+    setShowEndConfirm(false);
     try {
       const result = await endRoomApi(code, sessionToken);
       setRoom((prev) => (prev ? { ...prev, ...result.room } : prev));
+      toast(t.roomHeader.ended, "info");
     } catch (err) {
-      alert(err instanceof Error ? err.message : t.room.errorEndRoom);
+      toast(err instanceof Error ? err.message : t.room.errorEndRoom, "error");
     }
   };
 
-  // Loading state
+  // Expiry check
+  const [isExpiredLocally, setIsExpiredLocally] = useState(false);
+
+  useEffect(() => {
+    if (!room?.expiresAt) return;
+    function checkExpiry() {
+      const expired = new Date(room!.expiresAt).getTime() <= Date.now();
+      setIsExpiredLocally(expired);
+    }
+    checkExpiry();
+    const timer = setInterval(checkExpiry, 1000);
+    return () => clearInterval(timer);
+  }, [room?.expiresAt]);
+
+  // Loading — skeleton
   if (loading) {
     return (
-      <div className="h-screen flex items-center justify-center">
-        <div className="text-center">
-          <svg className="w-8 h-8 animate-spin mx-auto text-red-500 mb-3" fill="none" viewBox="0 0 24 24">
-            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-          </svg>
-          <p className="text-gray-400 text-sm">{t.room.loadingRoom}</p>
+      <div className="h-screen flex flex-col bg-gray-950">
+        {/* Skeleton header */}
+        <div className="bg-gray-900 border-b border-gray-800 px-4 py-3 flex items-center justify-between animate-pulse">
+          <div className="flex items-center gap-3">
+            <div className="w-2.5 h-2.5 rounded-full bg-gray-700" />
+            <div>
+              <div className="h-3.5 w-32 bg-gray-700 rounded" />
+              <div className="h-2.5 w-20 bg-gray-800 rounded mt-1" />
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <div className="h-8 w-8 bg-gray-800 rounded" />
+            <div className="h-8 w-8 bg-gray-800 rounded" />
+          </div>
+        </div>
+        {/* Skeleton messages */}
+        <div className="flex-1 p-4 space-y-4 animate-pulse">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className={`flex ${i % 2 === 0 ? "justify-end" : "justify-start"}`}>
+              <div className={`rounded-xl p-3 ${i % 2 === 0 ? "bg-red-900/20" : "bg-gray-800"}`} style={{ width: `${30 + i * 15}%` }}>
+                <div className="h-2.5 bg-gray-700 rounded w-16 mb-2" />
+                <div className="h-3 bg-gray-700 rounded" />
+                <div className="h-3 bg-gray-700 rounded mt-1 w-3/4" />
+              </div>
+            </div>
+          ))}
+        </div>
+        {/* Skeleton input */}
+        <div className="border-t border-gray-800 bg-gray-900 px-4 py-3 animate-pulse">
+          <div className="flex gap-2">
+            <div className="w-9 h-9 bg-gray-800 rounded-lg" />
+            <div className="flex-1 h-10 bg-gray-800 rounded-lg" />
+            <div className="w-9 h-9 bg-gray-800 rounded-lg" />
+          </div>
         </div>
       </div>
     );
@@ -125,7 +224,7 @@ export default function RoomPage({
   if (error || !room) {
     return (
       <div className="h-screen flex items-center justify-center">
-        <div className="text-center max-w-md">
+        <div className="text-center max-w-md animate-[fadeIn_0.3s_ease-out]">
           <div className="text-4xl mb-4">⚠️</div>
           <h2 className="text-xl font-bold text-gray-100 mb-2">
             {t.room.cannotAccess}
@@ -142,22 +241,6 @@ export default function RoomPage({
     );
   }
 
-  // Check if room is ended: either status is not active OR expiresAt has passed
-  const [isExpiredLocally, setIsExpiredLocally] = useState(false);
-
-  useEffect(() => {
-    if (!room?.expiresAt) return;
-
-    function checkExpiry() {
-      const expired = new Date(room!.expiresAt).getTime() <= Date.now();
-      setIsExpiredLocally(expired);
-    }
-
-    checkExpiry();
-    const timer = setInterval(checkExpiry, 1000);
-    return () => clearInterval(timer);
-  }, [room?.expiresAt]);
-
   const isEnded = room.status !== "active" || isExpiredLocally;
 
   return (
@@ -173,8 +256,11 @@ export default function RoomPage({
         status={room.status}
         isOwner={isOwner}
         participantCount={participants.length}
-        onEndRoom={handleEndRoom}
+        onEndRoom={() => setShowEndConfirm(true)}
         onToggleParticipants={() => setShowParticipants(!showParticipants)}
+        onShowRoomInfo={() => setShowRoomInfo(true)}
+        soundEnabled={soundEnabled}
+        onToggleSound={toggleSound}
       />
 
       {/* Connection status bar */}
@@ -193,25 +279,26 @@ export default function RoomPage({
         </div>
       )}
 
-      {/* Main content: chat + participants */}
+      {/* Main content */}
       <div className="flex flex-1 min-h-0">
-        {/* Chat area */}
         <div className="flex-1 flex flex-col min-w-0">
           <ChatArea
             messages={messages}
             currentSessionId={participantId}
+            onReply={(msg) => setReplyTo(msg)}
+            typingUsers={typingUsers}
           />
-
-          {/* Message input */}
           <MessageInput
             onSendMessage={sendMessage}
+            onTyping={emitTyping}
             roomCode={code}
             sessionToken={sessionToken}
             disabled={isEnded}
+            replyTo={replyTo}
+            onCancelReply={() => setReplyTo(null)}
           />
         </div>
 
-        {/* Participants sidebar */}
         <ParticipantList
           participants={participants}
           currentSessionId={participantId}
@@ -219,6 +306,32 @@ export default function RoomPage({
           onClose={() => setShowParticipants(false)}
         />
       </div>
+
+      {/* End room confirm dialog */}
+      <ConfirmDialog
+        open={showEndConfirm}
+        title={t.confirmDialog.endRoomTitle}
+        message={t.confirmDialog.endRoomMessage}
+        confirmLabel={t.confirmDialog.endRoomConfirm}
+        cancelLabel={t.confirmDialog.cancel}
+        variant="danger"
+        onConfirm={handleEndRoom}
+        onCancel={() => setShowEndConfirm(false)}
+      />
+
+      {/* Room info modal */}
+      <RoomInfoModal
+        open={showRoomInfo}
+        onClose={() => setShowRoomInfo(false)}
+        room={{
+          title: room.title,
+          description: room.description,
+          roomCode: room.roomCode,
+          status: room.status,
+          createdAt: room.createdAt || "",
+          expiresAt: room.expiresAt,
+        }}
+      />
     </div>
   );
 }

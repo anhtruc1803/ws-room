@@ -11,6 +11,7 @@ interface UseSocketOptions {
   onUserJoined: (participant: ParticipantData) => void;
   onUserLeft: (participant: ParticipantData) => void;
   onRoomEnded: () => void;
+  onTyping?: (displayName: string) => void;
 }
 
 export function useSocket({
@@ -20,13 +21,13 @@ export function useSocket({
   onUserJoined,
   onUserLeft,
   onRoomEnded,
+  onTyping,
 }: UseSocketOptions) {
   const socketRef = useRef<Socket | null>(null);
   const [connected, setConnected] = useState(false);
 
   useEffect(() => {
     // Socket.IO server runs on a separate port from Next.js
-    // Use NEXT_PUBLIC_SOCKET_URL if set, otherwise derive from current origin
     const socketUrl = process.env.NEXT_PUBLIC_SOCKET_URL || (() => {
       const origin = window.location.origin;
       try {
@@ -48,7 +49,6 @@ export function useSocket({
 
     socket.on("connect", () => {
       console.log("[Socket] Connected");
-      // Authenticate
       socket.emit("authenticate", { token });
     });
 
@@ -65,7 +65,6 @@ export function useSocket({
     // Server sends { participant, message } for user-joined
     socket.on("user-joined", (data: { participant: ParticipantData; message?: MessageData }) => {
       onUserJoined(data.participant);
-      // Also add the system message if present
       if (data.message) {
         onMessage(data.message as MessageData);
       }
@@ -81,6 +80,11 @@ export function useSocket({
 
     socket.on("room-ended", () => {
       onRoomEnded();
+    });
+
+    // Typing indicator from other users
+    socket.on("user-typing", (data: { displayName: string }) => {
+      onTyping?.(data.displayName);
     });
 
     socket.on("error", (err: { message: string }) => {
@@ -101,13 +105,13 @@ export function useSocket({
     return () => {
       socket.emit("leave-room");
 
-      // Cleanup all listeners to prevent duplicates on React remounts
       socket.off("connect");
       socket.off("authenticated");
       socket.off("new-message");
       socket.off("user-joined");
       socket.off("user-left");
       socket.off("room-ended");
+      socket.off("user-typing");
       socket.off("error");
       socket.off("connect_error");
       socket.off("disconnect");
@@ -125,5 +129,9 @@ export function useSocket({
     });
   }, []);
 
-  return { connected, sendMessage };
+  const emitTyping = useCallback(() => {
+    socketRef.current?.emit("typing");
+  }, []);
+
+  return { connected, sendMessage, emitTyping };
 }
