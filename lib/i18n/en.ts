@@ -109,6 +109,7 @@ const en = {
     replyTo: "Reply to",
     replying: "Replying to",
     cancelReply: "Cancel reply",
+    unknownUser: "Unknown",
   },
 
   // ── Participants ────────────────────────────────────────

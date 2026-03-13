@@ -40,8 +40,11 @@ export interface MessageData {
   attachment?: AttachmentData | null;
   replyTo?: {
     id: string;
-    senderName: string | null;
+    senderName?: string | null;
     content: string;
+    sender?: {
+      displayName: string;
+    } | null;
   } | null;
 }
 
