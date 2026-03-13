@@ -1,6 +1,7 @@
 "use client";
 
 import type { ParticipantData } from "@/lib/api-client";
+import { useTranslation } from "@/hooks/useTranslation";
 
 interface ParticipantListProps {
   participants: ParticipantData[];
@@ -15,13 +16,15 @@ export function ParticipantList({
   visible,
   onClose,
 }: ParticipantListProps) {
+  const { t } = useTranslation();
+
   if (!visible) return null;
 
   return (
     <div className="w-64 border-l border-gray-800 bg-gray-900 flex flex-col shrink-0">
       <div className="flex items-center justify-between px-4 py-3 border-b border-gray-800">
         <h3 className="text-sm font-semibold text-gray-300">
-          Participants ({participants.length})
+          {t.participants.title} ({participants.length})
         </h3>
         <button
           onClick={onClose}
@@ -48,12 +51,12 @@ export function ParticipantList({
               <p className="text-sm text-gray-200 truncate">
                 {p.displayName}
                 {p.id === currentSessionId && (
-                  <span className="text-xs text-gray-500 ml-1">(you)</span>
+                  <span className="text-xs text-gray-500 ml-1">{t.participants.you}</span>
                 )}
               </p>
               {p.role === "owner" && (
                 <span className="text-[10px] text-yellow-500 font-medium">
-                  OWNER
+                  {t.participants.owner}
                 </span>
               )}
             </div>

@@ -46,6 +46,25 @@ export function initSocketServer(httpServer: HttpServer): Server {
   const subClient = redis.duplicate();
   io.adapter(createAdapter(pubClient, subClient));
 
+  // Listen for broadcast events from HTTP APIs
+  const externalSubClient = redis.duplicate();
+  externalSubClient.subscribe("socket-broadcast");
+  externalSubClient.on("message", (channel, messageStr) => {
+    if (channel === "socket-broadcast" && io) {
+      try {
+        const data = JSON.parse(messageStr);
+        if (data.event === "new-message") {
+          io.to(`room:${data.roomCode}`).emit("new-message", data.payload);
+        } else if (data.event === "room-ended") {
+          io.to(`room:${data.roomCode}`).emit("room-ended", {});
+          io.in(`room:${data.roomCode}`).socketsLeave(`room:${data.roomCode}`);
+        }
+      } catch (err) {
+        console.error("[Socket] Broadcast parse error:", err);
+      }
+    }
+  });
+
   io.on("connection", (socket: Socket) => {
     console.log(`[Socket] Connected: ${socket.id}`);
 

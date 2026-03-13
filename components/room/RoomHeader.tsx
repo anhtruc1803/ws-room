@@ -1,6 +1,7 @@
 "use client";
 
 import { useCountdown } from "@/hooks/useCountdown";
+import { useTranslation } from "@/hooks/useTranslation";
 import { Button } from "@/components/ui/Button";
 
 interface RoomHeaderProps {
@@ -26,6 +27,7 @@ export function RoomHeader({
 }: RoomHeaderProps) {
   const remaining = useCountdown(expiresAt);
   const isExpired = remaining === "Expired";
+  const { t } = useTranslation();
 
   return (
     <header className="bg-gray-900 border-b border-gray-800 px-4 py-3 flex items-center justify-between gap-4 shrink-0">
@@ -44,7 +46,11 @@ export function RoomHeader({
             <span className="font-mono">{roomCode}</span>
             <span>·</span>
             <span className={isExpired ? "text-red-400" : "text-yellow-400"}>
-              {status === "locked" ? "Ended" : remaining}
+              {status === "locked"
+                ? t.roomHeader.ended
+                : isExpired
+                  ? t.roomHeader.expired
+                  : remaining}
             </span>
           </div>
         </div>
@@ -67,7 +73,7 @@ export function RoomHeader({
             const url = `${window.location.origin}/join/${roomCode}`;
             navigator.clipboard.writeText(url);
           }}
-          title="Copy invite link"
+          title={t.roomHeader.copyInviteLink}
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
@@ -77,7 +83,7 @@ export function RoomHeader({
         {/* End room button (owner only) */}
         {isOwner && status === "active" && (
           <Button variant="danger" size="sm" onClick={onEndRoom}>
-            End Room
+            {t.roomHeader.endRoom}
           </Button>
         )}
       </div>

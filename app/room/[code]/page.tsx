@@ -8,6 +8,7 @@ import { MessageInput } from "@/components/room/MessageInput";
 import { ParticipantList } from "@/components/room/ParticipantList";
 import { WatermarkOverlay } from "@/components/room/WatermarkOverlay";
 import { useSocket } from "@/hooks/useSocket";
+import { useTranslation } from "@/hooks/useTranslation";
 import { getSession } from "@/lib/session-store";
 import {
   getRoomInfo,
@@ -24,6 +25,7 @@ export default function RoomPage({
 }) {
   const { code } = use(params);
   const router = useRouter();
+  const { t } = useTranslation();
 
   // State
   const [room, setRoom] = useState<RoomData | null>(null);
@@ -84,23 +86,23 @@ export default function RoomPage({
         setMessages(data.messages);
         setParticipants(data.participants);
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to load room");
+        setError(err instanceof Error ? err.message : t.room.roomNotFound);
       } finally {
         setLoading(false);
       }
     }
 
     load();
-  }, [code, sessionToken, router]);
+  }, [code, sessionToken, router, t.room.roomNotFound]);
 
   // End room handler
   const handleEndRoom = async () => {
-    if (!confirm("Are you sure you want to end this room? This cannot be undone.")) return;
+    if (!confirm(t.room.confirmEndRoom)) return;
     try {
       const result = await endRoomApi(code, sessionToken);
       setRoom((prev) => (prev ? { ...prev, ...result.room } : prev));
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Failed to end room");
+      alert(err instanceof Error ? err.message : t.room.errorEndRoom);
     }
   };
 
@@ -113,7 +115,7 @@ export default function RoomPage({
             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
           </svg>
-          <p className="text-gray-400 text-sm">Loading room...</p>
+          <p className="text-gray-400 text-sm">{t.room.loadingRoom}</p>
         </div>
       </div>
     );
@@ -126,14 +128,14 @@ export default function RoomPage({
         <div className="text-center max-w-md">
           <div className="text-4xl mb-4">⚠️</div>
           <h2 className="text-xl font-bold text-gray-100 mb-2">
-            Cannot Access Room
+            {t.room.cannotAccess}
           </h2>
-          <p className="text-gray-400 mb-6">{error || "Room not found"}</p>
+          <p className="text-gray-400 mb-6">{error || t.room.roomNotFound}</p>
           <button
             onClick={() => router.push("/")}
             className="text-red-400 hover:text-red-300 underline cursor-pointer"
           >
-            Return Home
+            {t.room.returnHome}
           </button>
         </div>
       </div>
@@ -162,7 +164,7 @@ export default function RoomPage({
       {/* Connection status bar */}
       {!connected && !isEnded && (
         <div className="bg-yellow-900/30 border-b border-yellow-800 px-4 py-1.5 text-center">
-          <span className="text-xs text-yellow-400">Connecting...</span>
+          <span className="text-xs text-yellow-400">{t.room.connecting}</span>
         </div>
       )}
 
@@ -170,7 +172,7 @@ export default function RoomPage({
       {isEnded && (
         <div className="bg-red-900/30 border-b border-red-800 px-4 py-2 text-center">
           <span className="text-sm text-red-300">
-            This room has been ended. Messages are read-only.
+            {t.room.roomEnded}
           </span>
         </div>
       )}

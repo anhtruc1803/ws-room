@@ -26,6 +26,8 @@ export const ALLOWED_MIME_TYPES: Record<string, string[]> = {
   // Archives
   "application/zip": [".zip"],
   "application/gzip": [".gz"],
+  // Custom/Unknown
+  "application/octet-stream": [".*"],
 };
 
 export interface UploadValidationResult {

@@ -3,11 +3,13 @@
 import { useState, use } from "react";
 import { useRouter } from "next/navigation";
 import { Logo } from "@/components/layout/Logo";
+import { LanguageSwitcher } from "@/components/layout/LanguageSwitcher";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/Card";
 import { joinRoom } from "@/lib/api-client";
 import { saveSession } from "@/lib/session-store";
+import { useTranslation } from "@/hooks/useTranslation";
 
 export default function JoinRoomPage({
   params,
@@ -16,6 +18,7 @@ export default function JoinRoomPage({
 }) {
   const { code } = use(params);
   const router = useRouter();
+  const { t } = useTranslation();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [displayName, setDisplayName] = useState("");
@@ -27,7 +30,7 @@ export default function JoinRoomPage({
     setError("");
 
     if (!displayName.trim()) {
-      setError("Display name is required");
+      setError(t.joinRoom.errorNameRequired);
       return;
     }
 
@@ -48,7 +51,7 @@ export default function JoinRoomPage({
 
       router.push(`/room/${result.room.roomCode}`);
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Failed to join room";
+      const message = err instanceof Error ? err.message : t.joinRoom.errorJoinFailed;
       if (message.toLowerCase().includes("password")) {
         setNeedsPassword(true);
       }
@@ -59,7 +62,12 @@ export default function JoinRoomPage({
   };
 
   return (
-    <main className="min-h-screen flex flex-col items-center justify-center p-6">
+    <main className="min-h-screen flex flex-col items-center justify-center p-6 relative">
+      {/* Language switcher */}
+      <div className="absolute top-4 right-4">
+        <LanguageSwitcher />
+      </div>
+
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
           <button onClick={() => router.push("/")} className="inline-block cursor-pointer">
@@ -69,17 +77,17 @@ export default function JoinRoomPage({
 
         <Card>
           <CardHeader>
-            <CardTitle>Join Incident Room</CardTitle>
+            <CardTitle>{t.joinRoom.title}</CardTitle>
             <CardDescription>
-              Room Code:{" "}
+              {t.joinRoom.roomCode}:{" "}
               <span className="font-mono text-gray-200 tracking-wider">{code}</span>
             </CardDescription>
           </CardHeader>
 
           <form onSubmit={handleJoin} className="space-y-4">
             <Input
-              label="Your Display Name"
-              placeholder="e.g. Bob (Backend)"
+              label={t.joinRoom.displayName}
+              placeholder={t.joinRoom.displayNamePlaceholder}
               value={displayName}
               onChange={(e) => setDisplayName(e.target.value)}
               required
@@ -89,9 +97,9 @@ export default function JoinRoomPage({
 
             {needsPassword && (
               <Input
-                label="Room Password"
+                label={t.joinRoom.roomPassword}
                 type="password"
-                placeholder="Enter room password"
+                placeholder={t.joinRoom.roomPasswordPlaceholder}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
               />
@@ -104,7 +112,7 @@ export default function JoinRoomPage({
             )}
 
             <Button type="submit" size="lg" className="w-full" loading={loading}>
-              Join Room
+              {t.joinRoom.joinButton}
             </Button>
           </form>
         </Card>

@@ -3,25 +3,18 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Logo } from "@/components/layout/Logo";
+import { LanguageSwitcher } from "@/components/layout/LanguageSwitcher";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Textarea } from "@/components/ui/Textarea";
 import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/Card";
 import { createRoom } from "@/lib/api-client";
 import { saveSession } from "@/lib/session-store";
-
-const DURATION_OPTIONS = [
-  { label: "15 min", value: 15 },
-  { label: "30 min", value: 30 },
-  { label: "1 hour", value: 60 },
-  { label: "2 hours", value: 120 },
-  { label: "4 hours", value: 240 },
-  { label: "8 hours", value: 480 },
-  { label: "24 hours", value: 1440 },
-];
+import { useTranslation } from "@/hooks/useTranslation";
 
 export default function CreateRoomPage() {
   const router = useRouter();
+  const { t } = useTranslation();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -32,16 +25,26 @@ export default function CreateRoomPage() {
   const [password, setPassword] = useState("");
   const [usePassword, setUsePassword] = useState(false);
 
+  const DURATION_OPTIONS = [
+    { label: t.createRoom.duration15m, value: 15 },
+    { label: t.createRoom.duration30m, value: 30 },
+    { label: t.createRoom.duration1h, value: 60 },
+    { label: t.createRoom.duration2h, value: 120 },
+    { label: t.createRoom.duration4h, value: 240 },
+    { label: t.createRoom.duration8h, value: 480 },
+    { label: t.createRoom.duration24h, value: 1440 },
+  ];
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
 
     if (!title.trim()) {
-      setError("Incident title is required");
+      setError(t.createRoom.errorTitleRequired);
       return;
     }
     if (!displayName.trim()) {
-      setError("Your display name is required");
+      setError(t.createRoom.errorNameRequired);
       return;
     }
 
@@ -65,14 +68,19 @@ export default function CreateRoomPage() {
 
       router.push(`/room/${result.room.roomCode}`);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to create room");
+      setError(err instanceof Error ? err.message : t.createRoom.errorCreateFailed);
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <main className="min-h-screen flex flex-col items-center justify-center p-6">
+    <main className="min-h-screen flex flex-col items-center justify-center p-6 relative">
+      {/* Language switcher */}
+      <div className="absolute top-4 right-4">
+        <LanguageSwitcher />
+      </div>
+
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
           <button onClick={() => router.push("/")} className="inline-block cursor-pointer">
@@ -82,16 +90,16 @@ export default function CreateRoomPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Create Incident Room</CardTitle>
+            <CardTitle>{t.createRoom.title}</CardTitle>
             <CardDescription>
-              Set up a temporary collaboration space for your team.
+              {t.createRoom.description}
             </CardDescription>
           </CardHeader>
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <Input
-              label="Incident Title"
-              placeholder="e.g. Database outage - Production"
+              label={t.createRoom.incidentTitle}
+              placeholder={t.createRoom.incidentTitlePlaceholder}
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               required
@@ -99,8 +107,8 @@ export default function CreateRoomPage() {
             />
 
             <Textarea
-              label="Description (optional)"
-              placeholder="Brief description of the incident..."
+              label={t.createRoom.descriptionLabel}
+              placeholder={t.createRoom.descriptionPlaceholder}
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               rows={2}
@@ -108,8 +116,8 @@ export default function CreateRoomPage() {
             />
 
             <Input
-              label="Your Display Name"
-              placeholder="e.g. Alice (SRE)"
+              label={t.createRoom.displayName}
+              placeholder={t.createRoom.displayNamePlaceholder}
               value={displayName}
               onChange={(e) => setDisplayName(e.target.value)}
               required
@@ -119,7 +127,7 @@ export default function CreateRoomPage() {
             {/* Duration selector */}
             <div>
               <label className="block text-sm font-medium text-gray-300 mb-1.5">
-                Room Duration
+                {t.createRoom.roomDuration}
               </label>
               <div className="flex flex-wrap gap-2">
                 {DURATION_OPTIONS.map((opt) => (
@@ -148,13 +156,13 @@ export default function CreateRoomPage() {
                   onChange={(e) => setUsePassword(e.target.checked)}
                   className="rounded border-gray-700 bg-gray-900 text-red-500 focus:ring-red-500"
                 />
-                <span className="text-sm text-gray-300">Require password to join</span>
+                <span className="text-sm text-gray-300">{t.createRoom.requirePassword}</span>
               </label>
               {usePassword && (
                 <div className="mt-2">
                   <Input
                     type="password"
-                    placeholder="Room password"
+                    placeholder={t.createRoom.roomPassword}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                   />
@@ -169,7 +177,7 @@ export default function CreateRoomPage() {
             )}
 
             <Button type="submit" size="lg" className="w-full" loading={loading}>
-              Create Room
+              {t.createRoom.createButton}
             </Button>
           </form>
         </Card>

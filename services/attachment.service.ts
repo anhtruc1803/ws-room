@@ -5,6 +5,7 @@ import {
   generateStorageKey,
 } from "@/lib/upload-validation";
 import { AppError, NotFoundError, ForbiddenError } from "@/lib/errors";
+import { v4 as uuidv4 } from "uuid";
 
 // ============================================================
 // Types
@@ -20,8 +21,6 @@ export interface UploadFileInput {
   size: number;
   buffer: Buffer;
 }
-
-import { v4 as uuidv4 } from "uuid";
 
 // ============================================================
 // Upload File

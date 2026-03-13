@@ -2,6 +2,7 @@
 
 import { useState, useRef } from "react";
 import { uploadFile } from "@/lib/api-client";
+import { useTranslation } from "@/hooks/useTranslation";
 import { ALLOWED_MIME_TYPES, MAX_FILE_SIZE } from "@/lib/upload-validation";
 
 interface MessageInputProps {
@@ -20,6 +21,7 @@ export function MessageInput({
   const [text, setText] = useState("");
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const { t } = useTranslation();
 
   const handleSend = () => {
     const trimmed = text.trim();
@@ -40,7 +42,7 @@ export function MessageInput({
     if (!file) return;
 
     if (file.size > MAX_FILE_SIZE) {
-      alert(`File too large. Max size is ${MAX_FILE_SIZE / 1024 / 1024}MB`);
+      alert(t.chat.fileTooLarge.replace("{size}", String(MAX_FILE_SIZE / 1024 / 1024)));
       return;
     }
 
@@ -49,7 +51,7 @@ export function MessageInput({
       await uploadFile(roomCode, sessionToken, file);
       // Message will be received via Socket.IO broadcast
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Upload failed");
+      alert(err instanceof Error ? err.message : t.chat.uploadFailed);
     } finally {
       setUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = "";
@@ -67,7 +69,7 @@ export function MessageInput({
           onClick={() => fileInputRef.current?.click()}
           disabled={disabled || uploading}
           className="p-2 text-gray-400 hover:text-gray-200 hover:bg-gray-800 rounded-lg transition-colors disabled:opacity-50 cursor-pointer shrink-0"
-          title="Upload file"
+          title={t.chat.uploadFile}
         >
           {uploading ? (
             <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
@@ -94,7 +96,7 @@ export function MessageInput({
           value={text}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder={disabled ? "Room ended" : "Type a message... (Enter to send, Shift+Enter for new line)"}
+          placeholder={disabled ? t.chat.roomEndedPlaceholder : t.chat.typePlaceholder}
           disabled={disabled}
           rows={1}
           className="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-100 placeholder-gray-500 resize-none focus:outline-none focus:ring-2 focus:ring-red-500/50 focus:border-red-500 disabled:opacity-50 max-h-32"

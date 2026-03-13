@@ -74,6 +74,17 @@ export function useSocket({
 
     return () => {
       socket.emit("leave-room");
+      
+      // Cleanup all listeners to prevent duplicates on React remounts
+      socket.off("connect");
+      socket.off("authenticated");
+      socket.off("new-message");
+      socket.off("user-joined");
+      socket.off("user-left");
+      socket.off("room-ended");
+      socket.off("error");
+      socket.off("disconnect");
+      
       socket.disconnect();
       socketRef.current = null;
     };
