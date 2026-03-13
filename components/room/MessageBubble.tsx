@@ -132,6 +132,18 @@ export function MessageBubble({ message, isOwnMessage, onReply }: MessageBubbleP
             </p>
           )}
 
+          {/* Replied Message Quote */}
+          {message.replyTo && (
+            <div className="mb-2 p-2 rounded bg-gray-900/40 border-l-2 border-gray-600/50 text-xs">
+              <span className="font-semibold text-gray-400 block mb-0.5">
+                {message.replyTo.senderName || "?"}
+              </span>
+              <span className="text-gray-500 line-clamp-1 break-all">
+                {message.replyTo.content}
+              </span>
+            </div>
+          )}
+
           {/* Message content */}
           {message.type === "attachment" ? (
             <FilePreview message={message} />
