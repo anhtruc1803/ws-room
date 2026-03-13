@@ -142,7 +142,23 @@ export default function RoomPage({
     );
   }
 
-  const isEnded = room.status !== "active";
+  // Check if room is ended: either status is not active OR expiresAt has passed
+  const [isExpiredLocally, setIsExpiredLocally] = useState(false);
+
+  useEffect(() => {
+    if (!room?.expiresAt) return;
+
+    function checkExpiry() {
+      const expired = new Date(room!.expiresAt).getTime() <= Date.now();
+      setIsExpiredLocally(expired);
+    }
+
+    checkExpiry();
+    const timer = setInterval(checkExpiry, 1000);
+    return () => clearInterval(timer);
+  }, [room?.expiresAt]);
+
+  const isEnded = room.status !== "active" || isExpiredLocally;
 
   return (
     <div className="h-screen flex flex-col bg-gray-950 relative">

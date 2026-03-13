@@ -180,6 +180,24 @@ export function initSocketServer(httpServer: HttpServer): Server {
           return;
         }
 
+        // Check if room is still active and not expired
+        try {
+          const room = await prisma.room.findUnique({
+            where: { id: s.data.roomId },
+            select: { status: true, expiresAt: true },
+          });
+
+          if (!room || room.status !== "active" || room.expiresAt < new Date()) {
+            socket.emit("error", { message: "Room has expired or ended" });
+            socket.emit("room-ended");
+            return;
+          }
+        } catch (err) {
+          console.error("[Socket] Room check error:", err);
+          socket.emit("error", { message: "Failed to verify room status" });
+          return;
+        }
+
         // Rate limit: max 30 messages per minute per user via Redis
         const now = Date.now();
         const key = `ratelimit:socket:${s.data.sessionId}`;
