@@ -46,6 +46,8 @@ export interface MessageData {
       displayName: string;
     } | null;
   } | null;
+  readBy?: { readerId: string; readerName: string }[];
+  reactions?: { emoji: string; reacterId: string; reacterName: string }[];
 }
 
 export interface CreateRoomResponse {

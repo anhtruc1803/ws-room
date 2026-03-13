@@ -110,7 +110,7 @@ export default function RoomPage({
   }, []);
 
   // Socket connection
-  const { connected, sendMessage, emitTyping } = useSocket({
+  const { connected, sendMessage, emitTyping, markRead, reactMessage } = useSocket({
     token: sessionToken,
     roomCode: code,
     onMessage,
@@ -126,6 +126,27 @@ export default function RoomPage({
       setTimeout(() => {
         setTypingUsers((prev) => prev.filter((n) => n !== name));
       }, 3000);
+    }, []),
+    onMessagesRead: useCallback((data: { messageIds: string[]; readerId: string; readerName: string }) => {
+      setMessages((prev) =>
+        prev.map((msg) => {
+          if (!data.messageIds.includes(msg.id)) return msg;
+          const existing = msg.readBy || [];
+          if (existing.find((r) => r.readerId === data.readerId)) return msg;
+          return {
+            ...msg,
+            readBy: [...existing, { readerId: data.readerId, readerName: data.readerName }],
+          };
+        })
+      );
+    }, []),
+    onMessageReacted: useCallback((data: { messageId: string; reactions: { emoji: string; reacterId: string; reacterName: string }[] }) => {
+      setMessages((prev) =>
+        prev.map((msg) => {
+          if (msg.id !== data.messageId) return msg;
+          return { ...msg, reactions: data.reactions };
+        })
+      );
     }, []),
   });
 
@@ -287,6 +308,8 @@ export default function RoomPage({
             currentSessionId={participantId}
             onReply={(msg) => setReplyTo(msg)}
             typingUsers={typingUsers}
+            onMarkRead={markRead}
+            onReact={reactMessage}
           />
           <MessageInput
             onSendMessage={sendMessage}

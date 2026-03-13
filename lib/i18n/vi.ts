@@ -112,6 +112,8 @@ const vi: TranslationKeys = {
     replying: "Đang trả lời",
     cancelReply: "Hủy trả lời",
     unknownUser: "Người dùng ẩn danh",
+    react: "Bày tỏ cảm xúc",
+    seenBy: "Đã xem bởi",
   },
 
   // ── Thành viên ────────────────────────────────────────────

@@ -81,9 +81,11 @@ model ParticipantSession {
   leftAt       DateTime?
 
   // Relations
-  room         Room            @relation(fields: [roomId], references: [id], onDelete: Cascade)
-  messages     Message[]
-  auditLogs    AuditLog[]
+  room             Room              @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  messages         Message[]
+  auditLogs        AuditLog[]
+  messageReads     MessageRead[]
+  messageReactions MessageReaction[]
 
   @@index([roomId, isActive])
   @@index([sessionToken])
@@ -111,6 +113,10 @@ model Message {
   replyToId       String?     // ID of the message being replied to
   replyTo         Message?    @relation("MessageReplies", fields: [replyToId], references: [id], onDelete: SetNull)
   replies         Message[]   @relation("MessageReplies")
+
+  // Read receipts & reactions
+  readBy          MessageRead[]
+  reactions       MessageReaction[]
 
   @@index([roomId, createdAt])
   @@map("messages")
@@ -160,4 +166,41 @@ model AuditLog {
 
   @@index([roomId, createdAt])
   @@map("audit_logs")
+}
+
+// ============================================================
+// MESSAGE READ — tracks who has seen each message
+// ============================================================
+
+model MessageRead {
+  id        String   @id @default(cuid())
+  messageId String
+  readerId  String   // ParticipantSession ID
+  readAt    DateTime @default(now())
+
+  message   Message            @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  reader    ParticipantSession @relation(fields: [readerId], references: [id], onDelete: Cascade)
+
+  @@unique([messageId, readerId])
+  @@index([messageId])
+  @@map("message_reads")
+}
+
+// ============================================================
+// MESSAGE REACTION — emoji reactions on messages
+// ============================================================
+
+model MessageReaction {
+  id        String   @id @default(cuid())
+  messageId String
+  reacterId String   // ParticipantSession ID
+  emoji     String   @db.VarChar(16) // e.g. "👍", "❤️", "😂"
+  createdAt DateTime @default(now())
+
+  message   Message            @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  reacter   ParticipantSession @relation(fields: [reacterId], references: [id], onDelete: Cascade)
+
+  @@unique([messageId, reacterId, emoji]) // one reaction per emoji per user per message
+  @@index([messageId])
+  @@map("message_reactions")
 }

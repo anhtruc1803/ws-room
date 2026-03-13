@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { MessageBubble } from "./MessageBubble";
 import { useTranslation } from "@/hooks/useTranslation";
 import type { MessageData } from "@/lib/api-client";
@@ -10,15 +10,18 @@ interface ChatAreaProps {
   currentSessionId: string | null;
   onReply?: (message: MessageData) => void;
   typingUsers?: string[];
+  onMarkRead?: (messageIds: string[]) => void;
+  onReact?: (messageId: string, emoji: string) => void;
 }
 
-export function ChatArea({ messages, currentSessionId, onReply, typingUsers = [] }: ChatAreaProps) {
+export function ChatArea({ messages, currentSessionId, onReply, typingUsers = [], onMarkRead, onReact }: ChatAreaProps) {
   const bottomRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const { t } = useTranslation();
   const [showScrollBadge, setShowScrollBadge] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
   const prevLengthRef = useRef(messages.length);
+  const markedReadRef = useRef<Set<string>>(new Set());
 
   // Auto-scroll logic with unread badge
   useEffect(() => {
@@ -59,6 +62,52 @@ export function ChatArea({ messages, currentSessionId, onReply, typingUsers = []
     return () => container.removeEventListener("scroll", handleScroll);
   }, []);
 
+  // IntersectionObserver for auto-marking messages as read
+  useEffect(() => {
+    if (!onMarkRead || !currentSessionId) return;
+    const container = containerRef.current;
+    if (!container) return;
+
+    const pendingIds: string[] = [];
+    let flushTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const flush = () => {
+      if (pendingIds.length > 0) {
+        onMarkRead([...pendingIds]);
+        pendingIds.forEach((id) => markedReadRef.current.add(id));
+        pendingIds.length = 0;
+      }
+      flushTimer = null;
+    };
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (entry.isIntersecting) {
+            const msgId = (entry.target as HTMLElement).dataset.messageId;
+            if (msgId && !markedReadRef.current.has(msgId)) {
+              pendingIds.push(msgId);
+              if (!flushTimer) {
+                flushTimer = setTimeout(flush, 1000); // Batch reads every 1s
+              }
+            }
+          }
+        }
+      },
+      { root: container, threshold: 0.5 }
+    );
+
+    // Observe all message elements
+    const elements = container.querySelectorAll("[data-message-id]");
+    elements.forEach((el) => observer.observe(el));
+
+    return () => {
+      observer.disconnect();
+      if (flushTimer) clearTimeout(flushTimer);
+      flush();
+    };
+  }, [messages.length, onMarkRead, currentSessionId]);
+
   const scrollToBottom = () => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
     setShowScrollBadge(false);
@@ -85,12 +134,15 @@ export function ChatArea({ messages, currentSessionId, onReply, typingUsers = []
         className="absolute inset-0 overflow-y-auto py-3 space-y-2 custom-scrollbar"
       >
         {messages.map((msg) => (
-          <MessageBubble
-            key={msg.id}
-            message={msg}
-            isOwnMessage={msg.senderSessionId === currentSessionId}
-            onReply={onReply}
-          />
+          <div key={msg.id} data-message-id={msg.type !== "system" ? msg.id : undefined}>
+            <MessageBubble
+              message={msg}
+              isOwnMessage={msg.senderSessionId === currentSessionId}
+              onReply={onReply}
+              onReact={onReact}
+              currentSessionId={currentSessionId}
+            />
+          </div>
         ))}
 
         {/* Typing indicator */}

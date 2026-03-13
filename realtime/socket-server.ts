@@ -265,6 +265,97 @@ export function initSocketServer(httpServer: HttpServer): Server {
       });
     });
 
+    // ── Mark Read ────────────────────────────────────────
+    socket.on("mark-read", async (data: { messageIds: string[] }) => {
+      const s = socket as AuthenticatedSocket;
+      if (!s.data?.sessionId || !data.messageIds?.length) return;
+
+      try {
+        // Upsert read receipts for each message
+        for (const messageId of data.messageIds) {
+          await (prisma as any).messageRead.upsert({
+            where: {
+              messageId_readerId: {
+                messageId,
+                readerId: s.data.sessionId,
+              },
+            },
+            create: {
+              messageId,
+              readerId: s.data.sessionId,
+            },
+            update: {},
+          });
+        }
+
+        // Broadcast to room
+        const socketRoom = `room:${s.data.roomCode}`;
+        socket.to(socketRoom).emit("messages-read", {
+          messageIds: data.messageIds,
+          readerId: s.data.sessionId,
+          readerName: s.data.displayName,
+        });
+      } catch (err) {
+        console.error("[Socket] Mark read error:", err);
+      }
+    });
+
+    // ── React to Message ─────────────────────────────────
+    socket.on("react-message", async (data: { messageId: string; emoji: string }) => {
+      const s = socket as AuthenticatedSocket;
+      if (!s.data?.sessionId || !data.messageId || !data.emoji) return;
+
+      try {
+        // Toggle: if reaction exists, remove it; otherwise add it
+        const existing = await (prisma as any).messageReaction.findUnique({
+          where: {
+            messageId_reacterId_emoji: {
+              messageId: data.messageId,
+              reacterId: s.data.sessionId,
+              emoji: data.emoji,
+            },
+          },
+        });
+
+        if (existing) {
+          await (prisma as any).messageReaction.delete({
+            where: { id: existing.id },
+          });
+        } else {
+          await (prisma as any).messageReaction.create({
+            data: {
+              messageId: data.messageId,
+              reacterId: s.data.sessionId,
+              emoji: data.emoji,
+            },
+          });
+        }
+
+        // Fetch updated reactions for this message
+        const reactions = await (prisma as any).messageReaction.findMany({
+          where: { messageId: data.messageId },
+          select: {
+            emoji: true,
+            reacterId: true,
+            reacter: { select: { displayName: true } },
+          },
+        });
+
+        // Broadcast updated reactions to room
+        const socketRoom = `room:${s.data.roomCode}`;
+        io!.to(socketRoom).emit("message-reacted", {
+          messageId: data.messageId,
+          reactions: reactions.map((r: any) => ({
+            emoji: r.emoji,
+            reacterId: r.reacterId,
+            reacterName: r.reacter.displayName,
+          })),
+        });
+      } catch (err) {
+        console.error("[Socket] React error:", err);
+      }
+    });
+
     // ── Leave Room ────────────────────────────────────────
     socket.on("leave-room", async () => {
       await handleLeave(socket as AuthenticatedSocket);

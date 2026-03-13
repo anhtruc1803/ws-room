@@ -12,6 +12,8 @@ interface UseSocketOptions {
   onUserLeft: (participant: ParticipantData) => void;
   onRoomEnded: () => void;
   onTyping?: (displayName: string) => void;
+  onMessagesRead?: (data: { messageIds: string[]; readerId: string; readerName: string }) => void;
+  onMessageReacted?: (data: { messageId: string; reactions: { emoji: string; reacterId: string; reacterName: string }[] }) => void;
 }
 
 export function useSocket({
@@ -22,6 +24,8 @@ export function useSocket({
   onUserLeft,
   onRoomEnded,
   onTyping,
+  onMessagesRead,
+  onMessageReacted,
 }: UseSocketOptions) {
   const socketRef = useRef<Socket | null>(null);
   const [connected, setConnected] = useState(false);
@@ -87,6 +91,16 @@ export function useSocket({
       onTyping?.(data.displayName);
     });
 
+    // Read receipts from other users
+    socket.on("messages-read", (data: { messageIds: string[]; readerId: string; readerName: string }) => {
+      onMessagesRead?.(data);
+    });
+
+    // Reaction updates
+    socket.on("message-reacted", (data: { messageId: string; reactions: { emoji: string; reacterId: string; reacterName: string }[] }) => {
+      onMessageReacted?.(data);
+    });
+
     socket.on("error", (err: { message: string }) => {
       console.error("[Socket] Error:", err.message);
     });
@@ -112,6 +126,8 @@ export function useSocket({
       socket.off("user-left");
       socket.off("room-ended");
       socket.off("user-typing");
+      socket.off("messages-read");
+      socket.off("message-reacted");
       socket.off("error");
       socket.off("connect_error");
       socket.off("disconnect");
@@ -134,5 +150,15 @@ export function useSocket({
     socketRef.current?.emit("typing");
   }, []);
 
-  return { connected, sendMessage, emitTyping };
+  const markRead = useCallback((messageIds: string[]) => {
+    if (messageIds.length > 0) {
+      socketRef.current?.emit("mark-read", { messageIds });
+    }
+  }, []);
+
+  const reactMessage = useCallback((messageId: string, emoji: string) => {
+    socketRef.current?.emit("react-message", { messageId, emoji });
+  }, []);
+
+  return { connected, sendMessage, emitTyping, markRead, reactMessage };
 }

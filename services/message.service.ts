@@ -55,6 +55,19 @@ export async function getRecentMessages(roomId: string, limit = 100) {
           sender: { select: { displayName: true } },
         },
       },
+      readBy: {
+        select: {
+          readerId: true,
+          reader: { select: { displayName: true } },
+        },
+      },
+      reactions: {
+        select: {
+          emoji: true,
+          reacterId: true,
+          reacter: { select: { displayName: true } },
+        },
+      },
     },
   } as any);
 }
