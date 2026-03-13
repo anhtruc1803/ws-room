@@ -32,9 +32,24 @@ export function getIO(): Server {
 }
 
 export function initSocketServer(httpServer: HttpServer): Server {
+  const allowedOrigin = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+
   io = new Server(httpServer, {
     cors: {
-      origin: process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000",
+      origin: (origin, callback) => {
+        // Allow configured origin, no-origin (same-origin/server), and localhost variants
+        if (
+          !origin ||
+          origin === allowedOrigin ||
+          origin.includes("localhost") ||
+          origin.includes("127.0.0.1") ||
+          process.env.NODE_ENV !== "production"
+        ) {
+          callback(null, true);
+        } else {
+          callback(new Error(`CORS: origin ${origin} not allowed`));
+        }
+      },
       methods: ["GET", "POST"],
     },
     pingInterval: 25000,

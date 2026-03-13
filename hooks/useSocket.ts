@@ -25,8 +25,21 @@ export function useSocket({
   const [connected, setConnected] = useState(false);
 
   useEffect(() => {
-    const url = process.env.NEXT_PUBLIC_APP_URL || window.location.origin;
-    const socket = io(url, {
+    // Socket.IO server runs on a separate port from Next.js
+    // Use NEXT_PUBLIC_SOCKET_URL if set, otherwise derive from current origin
+    const socketUrl = process.env.NEXT_PUBLIC_SOCKET_URL || (() => {
+      const origin = window.location.origin;
+      try {
+        const url = new URL(origin);
+        url.port = "3001";
+        return url.toString();
+      } catch {
+        return "http://localhost:3001";
+      }
+    })();
+
+    console.log("[Socket] Connecting to:", socketUrl);
+    const socket = io(socketUrl, {
       transports: ["websocket", "polling"],
       autoConnect: false,
     });
@@ -49,12 +62,21 @@ export function useSocket({
       onMessage(message);
     });
 
-    socket.on("user-joined", (participant: ParticipantData) => {
-      onUserJoined(participant);
+    // Server sends { participant, message } for user-joined
+    socket.on("user-joined", (data: { participant: ParticipantData; message?: MessageData }) => {
+      onUserJoined(data.participant);
+      // Also add the system message if present
+      if (data.message) {
+        onMessage(data.message as MessageData);
+      }
     });
 
-    socket.on("user-left", (participant: ParticipantData) => {
-      onUserLeft(participant);
+    // Server sends { participant, message } for user-left
+    socket.on("user-left", (data: { participant: ParticipantData; message?: MessageData }) => {
+      onUserLeft(data.participant);
+      if (data.message) {
+        onMessage(data.message as MessageData);
+      }
     });
 
     socket.on("room-ended", () => {
@@ -63,6 +85,10 @@ export function useSocket({
 
     socket.on("error", (err: { message: string }) => {
       console.error("[Socket] Error:", err.message);
+    });
+
+    socket.on("connect_error", (err: Error) => {
+      console.error("[Socket] Connection error:", err.message);
     });
 
     socket.on("disconnect", () => {
@@ -74,7 +100,7 @@ export function useSocket({
 
     return () => {
       socket.emit("leave-room");
-      
+
       // Cleanup all listeners to prevent duplicates on React remounts
       socket.off("connect");
       socket.off("authenticated");
@@ -83,8 +109,9 @@ export function useSocket({
       socket.off("user-left");
       socket.off("room-ended");
       socket.off("error");
+      socket.off("connect_error");
       socket.off("disconnect");
-      
+
       socket.disconnect();
       socketRef.current = null;
     };
