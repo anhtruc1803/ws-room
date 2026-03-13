@@ -1,7 +1,7 @@
 # CODEBASE MAP — War Room
 
 > Ephemeral Incident Collaboration Platform
-> Tài liệu tham chiếu kiến trúc — cập nhật lần cuối: 2026-03-13
+> Tài liệu tham chiếu kiến trúc — cập nhật lần cuối: 2026-03-13 16:00
 
 ---
 
@@ -142,9 +142,9 @@ war-room/
 │   ├── layout/
 │   │   └── Logo.tsx              # App logo
 │   ├── room/
-│   │   ├── ChatArea.tsx          # Message list container
-│   │   ├── MessageBubble.tsx     # Single message display
-│   │   ├── MessageInput.tsx      # Text input + file upload trigger
+│   │   ├── ChatArea.tsx          # Message list + IntersectionObserver auto-read
+│   │   ├── MessageBubble.tsx     # Message display (emoji reactions, read receipts, image preview, lightbox)
+│   │   ├── MessageInput.tsx      # Text input + file upload + reply bar
 │   │   ├── ParticipantList.tsx   # Sidebar participant list
 │   │   ├── RoomHeader.tsx        # Room info header bar
 │   │   └── WatermarkOverlay.tsx  # Transparent watermark overlay
@@ -155,15 +155,20 @@ war-room/
 │       └── Textarea.tsx          # Textarea
 │
 ├── hooks/                        # Custom React hooks
-│   ├── useSocket.ts              # Socket.IO connection hook
-│   └── useCountdown.ts           # Countdown timer hook
+│   ├── useSocket.ts              # Socket.IO connection hook (chat, reactions, read receipts)
+│   ├── useCountdown.ts           # Countdown timer hook
+│   ├── useTranslation.ts         # i18n translation hook (EN/VI)
+│   └── useToast.ts               # Toast notification hook
 │
 ├── lib/                          # Shared utilities & config
-│   ├── api-client.ts             # Client-side API functions (fetch wrappers)
+│   ├── api-client.ts             # Client-side API functions + MessageData type
 │   ├── api-utils.ts              # Server-side API helpers (auth, error)
 │   ├── crypto.ts                 # Room code gen, session token, password hash
 │   ├── env.ts                    # Environment variable loader
 │   ├── errors.ts                 # Custom error classes (AppError, NotFoundError...)
+│   ├── i18n/                     # Internationalization
+│   │   ├── en.ts                 # English translations
+│   │   └── vi.ts                 # Vietnamese translations
 │   ├── prisma.ts                 # Prisma client singleton
 │   ├── queue.ts                  # BullMQ queue definition + schedulers
 │   ├── redis.ts                  # Redis client singleton (ioredis)
@@ -191,7 +196,7 @@ war-room/
 │   └── index.ts                  # getStorage() factory singleton
 │
 ├── prisma/                       # Database schema & migrations
-│   ├── schema.prisma             # Prisma schema (5 models)
+│   ├── schema.prisma             # Prisma schema (7 models)
 │   ├── seed.ts                   # Seed script
 │   └── migrations/               # Migration files
 │
@@ -242,8 +247,8 @@ createRoom() → generateRoomCode() → prisma.room.create()
 
 | Function | Mô tả |
 |---|---|
-| `saveMessage()` | Lưu tin nhắn vào DB (text, system, attachment) |
-| `getRecentMessages()` | Lấy N tin nhắn gần nhất với sender info + attachment |
+| `saveMessage()` | Lưu tin nhắn vào DB (text, system, attachment), hỗ trợ `replyToId` |
+| `getRecentMessages()` | Lấy N tin nhắn gần nhất với sender, attachment, replyTo, readBy, reactions |
 
 ---
 
@@ -284,7 +289,10 @@ API route nhận multipart/form-data
 |---|---|
 | `authenticate` | Gửi session token để xác thực |
 | `join-room` | Join Socket.IO room (sau khi authenticated) |
-| `send-message` | Gửi tin nhắn text |
+| `send-message` | Gửi tin nhắn text (hỗ trợ `replyToId`) |
+| `typing` | Thông báo đang gõ |
+| `mark-read` | Đánh dấu đã đọc (`{ messageIds }`) |
+| `react-message` | Thả/bỏ emoji reaction (`{ messageId, emoji }`) |
 | `leave-room` | Rời room |
 
 | Event (Server → Client) | Mô tả |
@@ -294,6 +302,9 @@ API route nhận multipart/form-data
 | `user-joined` | User mới tham gia |
 | `user-left` | User rời room |
 | `room-ended` | Room bị kết thúc |
+| `user-typing` | User đang gõ (`{ displayName }`) |
+| `messages-read` | Tin nhắn đã được đọc (`{ messageIds, readerId, readerName }`) |
+| `message-reacted` | Reactions cập nhật (`{ messageId, reactions[] }`) |
 | `participants-list` | Danh sách participants hiện tại |
 | `error` | Lỗi |
 
@@ -349,24 +360,25 @@ API route nhận multipart/form-data
 │ displayName            │    │ senderSessionId (FK) │
 │ role                   │──  │ type                 │── enum: text | system | attachment
 │ sessionToken (unique)  │    │ content              │
-│ isActive               │    │ createdAt            │
-│ joinedAt               │    └──────────┬───────────┘
-│ leftAt                 │               │ 1:1 (optional)
-└────────┬───────────────┘               ▼
-         │                    ┌──────────────────────┐
-         │                    │    Attachment         │
-         │                    │──────────────────────│
-         │                    │ id (PK)              │
-         │                    │ roomId (FK → Room)   │
-         │                    │ messageId (FK, unique)│
-         │                    │ filename             │
-         │                    │ mimeType             │
-         │                    │ size                 │
-         │                    │ storageKey           │
-         │                    │ expiresAt            │
-         │                    │ createdAt            │
-         │                    └──────────────────────┘
-         │
+│ isActive               │    │ replyToId (FK, self) │── self-relation (reply chain)
+│ joinedAt               │    │ createdAt            │
+│ leftAt                 │    └──────────┬───────────┘
+└────────┬───────────────┘       1:1     │  1:N          1:N
+         │                    (optional) │  (readBy)     (reactions)
+         │                       ▼       ▼               ▼
+         │          ┌──────────────┐ ┌──────────────┐ ┌──────────────────┐
+         │          │ Attachment   │ │ MessageRead  │ │ MessageReaction  │
+         │          │──────────────│ │──────────────│ │──────────────────│
+         │          │ id (PK)      │ │ id (PK)      │ │ id (PK)          │
+         │          │ roomId (FK)  │ │ messageId(FK)│ │ messageId (FK)   │
+         │          │ messageId(FK)│ │ readerId(FK) │ │ reacterId (FK)   │
+         │          │ filename     │ │ readAt       │ │ emoji            │
+         │          │ mimeType     │ └──────────────┘ │ createdAt        │
+         │          │ size         │  @@unique         └──────────────────┘
+         │          │ storageKey   │  [messageId,       @@unique
+         │          │ expiresAt    │   readerId]        [messageId,
+         │          │ createdAt    │                     reacterId, emoji]
+         │          └──────────────┘
          ▼
 ┌────────────────────────┐
 │      AuditLog          │
@@ -386,8 +398,10 @@ API route nhận multipart/form-data
 |---|---|---|
 | **Room** | Phòng incident chính, chứa metadata và TTL | Xóa room → xóa tất cả con |
 | **ParticipantSession** | Phiên tham gia của user (không có account system) | FK → Room |
-| **Message** | Tin nhắn chat (text, system event, attachment ref) | FK → Room, Session |
+| **Message** | Tin nhắn chat (text, system, attachment), hỗ trợ self-reply | FK → Room, Session |
 | **Attachment** | Metadata file đã upload (1:1 với Message) | FK → Room, Message |
+| **MessageRead** | Ai đã xem tin nhắn nào (unique per message+reader) | FK → Message, Session |
+| **MessageReaction** | Emoji reaction (unique per message+reacter+emoji, toggle) | FK → Message, Session |
 | **AuditLog** | Ghi lại hành động quan trọng (tạo room, join, upload, end) | FK → Room, Session |
 
 ### Indexes quan trọng
@@ -397,6 +411,8 @@ API route nhận multipart/form-data
 - `participant_sessions(roomId, isActive)` — lấy participants đang online
 - `participant_sessions(sessionToken)` — auth lookup
 - `messages(roomId, createdAt)` — lấy tin nhắn theo room
+- `message_reads(messageId)` — lookup read receipts
+- `message_reactions(messageId)` — lookup reactions
 - `attachments(expiresAt)` — cleanup job
 
 ---
@@ -798,8 +814,9 @@ npm run dev
 #### Sửa UI
 
 - **Room page chính**: `app/room/[code]/page.tsx` — orchestrator, state management
-- **Chat components**: `components/room/` — ChatArea, MessageBubble, MessageInput
+- **Chat components**: `components/room/` — ChatArea, MessageBubble (reactions, read receipts, image preview, lightbox, reply quote), MessageInput (reply bar)
 - **Shared UI**: `components/ui/` — Button, Card, Input, Textarea
+- **i18n**: `lib/i18n/` — EN/VI translations, `hooks/useTranslation.ts`
 - **Styling**: TailwindCSS classes trực tiếp trong components
 
 #### Data flow tổng quát
