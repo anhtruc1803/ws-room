@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect, useCallback } from "react";
 import type { MessageData } from "@/lib/api-client";
 import { getFileDownloadUrl } from "@/lib/api-client";
 import { getSession } from "@/lib/session-store";
@@ -23,11 +24,143 @@ function formatFileSize(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-function FilePreview({ message }: { message: MessageData }) {
+/* ── Lightbox Modal ─────────────────────────────────── */
+function ImageLightbox({
+  src,
+  alt,
+  onClose,
+}: {
+  src: string;
+  alt: string;
+  onClose: () => void;
+}) {
+  useEffect(() => {
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", handleKey);
+    return () => document.removeEventListener("keydown", handleKey);
+  }, [onClose]);
+
+  return (
+    <div
+      className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/80 backdrop-blur-sm animate-[fadeIn_0.15s_ease-out]"
+      onClick={onClose}
+    >
+      {/* Close button */}
+      <button
+        onClick={onClose}
+        className="absolute top-4 right-4 text-white/70 hover:text-white p-2 rounded-full bg-black/40 hover:bg-black/60 transition-colors cursor-pointer"
+      >
+        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+        </svg>
+      </button>
+      {/* Image */}
+      <img
+        src={src}
+        alt={alt}
+        className="max-w-[90vw] max-h-[90vh] object-contain rounded-lg shadow-2xl animate-[scaleIn_0.2s_ease-out]"
+        onClick={(e) => e.stopPropagation()}
+      />
+    </div>
+  );
+}
+
+/* ── Inline Image Preview ───────────────────────────── */
+function InlineImagePreview({ message }: { message: MessageData }) {
+  const att = message.attachment!;
+  const [imgUrl, setImgUrl] = useState<string | null>(null);
+  const [lightboxOpen, setLightboxOpen] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function fetchUrl() {
+      const session = getSession();
+      if (!session) return;
+      try {
+        const result = await getFileDownloadUrl(att.id, session.sessionToken);
+        if (!cancelled) setImgUrl(result.url);
+      } catch {
+        if (!cancelled) setError(true);
+      }
+    }
+    fetchUrl();
+    return () => { cancelled = true; };
+  }, [att.id]);
+
+  if (error) {
+    return <GenericFilePreview message={message} />;
+  }
+
+  return (
+    <>
+      <div className="mt-1 rounded-lg overflow-hidden relative group/img cursor-pointer max-w-[280px]">
+        {/* Skeleton while loading */}
+        {loading && (
+          <div className="w-full aspect-video bg-gray-700 animate-pulse rounded-lg flex items-center justify-center">
+            <svg className="w-8 h-8 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+            </svg>
+          </div>
+        )}
+
+        {imgUrl && (
+          <img
+            src={imgUrl}
+            alt={att.filename}
+            className={`w-full rounded-lg transition-opacity duration-300 ${loading ? "opacity-0 absolute" : "opacity-100"}`}
+            onLoad={() => setLoading(false)}
+            onError={() => { setError(true); setLoading(false); }}
+            onClick={() => setLightboxOpen(true)}
+          />
+        )}
+
+        {/* Hover overlay */}
+        {!loading && (
+          <div
+            className="absolute inset-0 bg-black/0 group-hover/img:bg-black/30 transition-colors flex items-center justify-center"
+            onClick={() => setLightboxOpen(true)}
+          >
+            <svg
+              className="w-8 h-8 text-white opacity-0 group-hover/img:opacity-100 transition-opacity drop-shadow-lg"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7" />
+            </svg>
+          </div>
+        )}
+
+        {/* Filename footer */}
+        <div className="mt-1 flex items-center gap-1.5 text-xs text-gray-500 px-0.5">
+          <svg className="w-3 h-3 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+          </svg>
+          <span className="truncate">{att.filename}</span>
+          <span className="shrink-0">· {formatFileSize(att.size)}</span>
+        </div>
+      </div>
+
+      {/* Lightbox */}
+      {lightboxOpen && imgUrl && (
+        <ImageLightbox
+          src={imgUrl}
+          alt={att.filename}
+          onClose={() => setLightboxOpen(false)}
+        />
+      )}
+    </>
+  );
+}
+
+/* ── Generic File Download Button ───────────────────── */
+function GenericFilePreview({ message }: { message: MessageData }) {
   const att = message.attachment;
   if (!att) return null;
-
-  const isImage = att.mimeType.startsWith("image/");
 
   const handleDownload = async () => {
     const session = getSession();
@@ -46,15 +179,9 @@ function FilePreview({ message }: { message: MessageData }) {
       className="mt-1 flex items-center gap-2 p-2 rounded-md bg-gray-800/50 hover:bg-gray-800 transition-colors text-left w-full cursor-pointer group"
     >
       <div className="w-8 h-8 rounded bg-gray-700 flex items-center justify-center text-xs shrink-0">
-        {isImage ? (
-          <svg className="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-          </svg>
-        ) : (
-          <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
-          </svg>
-        )}
+        <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+        </svg>
       </div>
       <div className="min-w-0 flex-1">
         <p className="text-sm text-blue-400 truncate group-hover:underline">{att.filename}</p>
@@ -65,6 +192,20 @@ function FilePreview({ message }: { message: MessageData }) {
       </svg>
     </button>
   );
+}
+
+/* ── FilePreview dispatcher ─────────────────────────── */
+function FilePreview({ message }: { message: MessageData }) {
+  const att = message.attachment;
+  if (!att) return null;
+
+  const isImage = att.mimeType.startsWith("image/");
+
+  if (isImage) {
+    return <InlineImagePreview message={message} />;
+  }
+
+  return <GenericFilePreview message={message} />;
 }
 
 export function MessageBubble({ message, isOwnMessage, onReply }: MessageBubbleProps) {
