@@ -107,6 +107,10 @@ model Message {
   room            Room        @relation(fields: [roomId], references: [id], onDelete: Cascade)
   sender          ParticipantSession? @relation(fields: [senderSessionId], references: [id], onDelete: SetNull)
   attachment      Attachment?
+  
+  replyToId       String?     // ID of the message being replied to
+  replyTo         Message?    @relation("MessageReplies", fields: [replyToId], references: [id], onDelete: SetNull)
+  replies         Message[]   @relation("MessageReplies")
 
   @@index([roomId, createdAt])
   @@map("messages")

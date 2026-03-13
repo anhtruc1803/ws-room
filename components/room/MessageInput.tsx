@@ -8,7 +8,7 @@ import { ALLOWED_MIME_TYPES, MAX_FILE_SIZE } from "@/lib/upload-validation";
 import type { MessageData } from "@/lib/api-client";
 
 interface MessageInputProps {
-  onSendMessage: (content: string) => void;
+  onSendMessage: (content: string, replyToId?: string) => void;
   onTyping?: () => void;
   roomCode: string;
   sessionToken: string;
@@ -37,7 +37,7 @@ export function MessageInput({
   const handleSend = () => {
     const trimmed = text.trim();
     if (trimmed.length === 0 || disabled) return;
-    onSendMessage(trimmed);
+    onSendMessage(trimmed, replyTo?.id);
     setText("");
     onCancelReply?.();
   };

@@ -173,7 +173,7 @@ export function initSocketServer(httpServer: HttpServer): Server {
     // ── Send Message ──────────────────────────────────────
     socket.on(
       "send-message",
-      async (data: { content: string; type?: string }) => {
+      async (data: { content: string; type?: string; replyToId?: string }) => {
         const s = socket as AuthenticatedSocket;
         if (!s.data?.sessionId) {
           socket.emit("error", { message: "Not authenticated" });
@@ -232,16 +232,21 @@ export function initSocketServer(httpServer: HttpServer): Server {
             senderSessionId: s.data.sessionId,
             type: "text",
             content,
+            replyToId: data.replyToId,
           });
+
+          // Cast to any to bypass Prisma type generation missing local replyTo
+          const msgAny = message as any;
 
           const socketRoom = `room:${s.data.roomCode}`;
           io!.to(socketRoom).emit("new-message", {
-            id: message.id,
+            id: msgAny.id,
             senderSessionId: s.data.sessionId,
             senderName: s.data.displayName,
             type: "text",
-            content: message.content,
-            createdAt: message.createdAt,
+            content: msgAny.content,
+            createdAt: msgAny.createdAt,
+            replyTo: msgAny.replyTo,
           });
         } catch (err) {
           console.error("[Socket] Message error:", err);

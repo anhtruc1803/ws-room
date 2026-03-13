@@ -5,6 +5,7 @@ export interface SaveMessageInput {
   senderSessionId: string | null;
   type: "text" | "system" | "attachment";
   content: string;
+  replyToId?: string;
 }
 
 export async function saveMessage(input: SaveMessageInput) {
@@ -14,10 +15,20 @@ export async function saveMessage(input: SaveMessageInput) {
       senderSessionId: input.senderSessionId,
       type: input.type,
       content: input.content,
+      replyToId: input.replyToId,
     },
-  });
+    include: {
+      replyTo: {
+        select: {
+          id: true,
+          content: true,
+          sender: { select: { displayName: true } },
+        },
+      },
+    },
+  } as any);
 
-  return message;
+  return message as any;
 }
 
 export async function getRecentMessages(roomId: string, limit = 100) {
@@ -37,6 +48,13 @@ export async function getRecentMessages(roomId: string, limit = 100) {
           size: true,
         },
       },
+      replyTo: {
+        select: {
+          id: true,
+          content: true,
+          sender: { select: { displayName: true } },
+        },
+      },
     },
-  });
+  } as any);
 }

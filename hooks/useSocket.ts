@@ -122,10 +122,11 @@ export function useSocket({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token, roomCode]);
 
-  const sendMessage = useCallback((content: string) => {
+  const sendMessage = useCallback((content: string, replyToId?: string) => {
     socketRef.current?.emit("send-message", {
       content,
       type: "text",
+      replyToId,
     });
   }, []);
 

@@ -38,6 +38,11 @@ export interface MessageData {
   content: string;
   createdAt: string;
   attachment?: AttachmentData | null;
+  replyTo?: {
+    id: string;
+    senderName: string | null;
+    content: string;
+  } | null;
 }
 
 export interface CreateRoomResponse {
