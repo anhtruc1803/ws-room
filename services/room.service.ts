@@ -191,7 +191,7 @@ export async function joinRoom(roomCode: string, input: JoinRoomInput) {
 // ============================================================
 
 export async function getRoomInfo(roomCode: string, sessionId: string) {
-  const room = await prisma.room.findUnique({
+  const room = await (prisma.room.findUnique as any)({
     where: { roomCode },
     include: {
       participants: {
@@ -223,6 +223,26 @@ export async function getRoomInfo(roomCode: string, sessionId: string) {
               size: true,
             },
           },
+          replyTo: {
+            select: {
+              id: true,
+              content: true,
+              sender: { select: { displayName: true } },
+            },
+          },
+          readBy: {
+            select: {
+              readerId: true,
+              reader: { select: { displayName: true } },
+            },
+          },
+          reactions: {
+            select: {
+              emoji: true,
+              reacterId: true,
+              reacter: { select: { displayName: true } },
+            },
+          },
         },
       },
     },
@@ -233,7 +253,7 @@ export async function getRoomInfo(roomCode: string, sessionId: string) {
   }
 
   // Verify the session belongs to this room
-  const participant = room.participants.find((p) => p.id === sessionId);
+  const participant = room.participants.find((p: any) => p.id === sessionId);
   if (!participant) {
     throw new ForbiddenError("You are not a participant of this room");
   }
@@ -251,7 +271,7 @@ export async function getRoomInfo(roomCode: string, sessionId: string) {
       createdAt: room.createdAt,
     },
     participants: room.participants,
-    messages: room.messages.reverse().map((m) => ({
+    messages: room.messages.reverse().map((m: any) => ({
       id: m.id,
       senderSessionId: m.senderSessionId,
       senderName: m.sender?.displayName || null,
@@ -259,6 +279,22 @@ export async function getRoomInfo(roomCode: string, sessionId: string) {
       content: m.content,
       createdAt: m.createdAt,
       attachment: m.attachment,
+      replyTo: m.replyTo
+        ? {
+            id: m.replyTo.id,
+            content: m.replyTo.content,
+            sender: m.replyTo.sender,
+          }
+        : null,
+      readBy: (m.readBy || []).map((r: any) => ({
+        readerId: r.readerId,
+        readerName: r.reader?.displayName || "?",
+      })),
+      reactions: (m.reactions || []).map((r: any) => ({
+        emoji: r.emoji,
+        reacterId: r.reacterId,
+        reacterName: r.reacter?.displayName || "?",
+      })),
     })),
   };
 }
