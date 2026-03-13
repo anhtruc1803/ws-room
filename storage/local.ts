@@ -24,11 +24,18 @@ export class LocalStorageProvider implements StorageProvider {
     await writeFile(filePath, buffer);
   }
 
-  async getSignedUrl(key: string, ttlSeconds: number): Promise<string> {
+  async getSignedUrl(key: string, ttlSeconds: number, filename?: string, mimeType?: string): Promise<string> {
     const expires = Math.floor(Date.now() / 1000) + ttlSeconds;
     const signature = this.sign(key, expires);
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
-    return `${baseUrl}/api/files/download?key=${encodeURIComponent(key)}&expires=${expires}&sig=${signature}`;
+    let url = `${baseUrl}/api/files/download?key=${encodeURIComponent(key)}&expires=${expires}&sig=${signature}`;
+    if (filename) {
+      url += `&filename=${encodeURIComponent(filename)}`;
+    }
+    if (mimeType) {
+      url += `&mime=${encodeURIComponent(mimeType)}`;
+    }
+    return url;
   }
 
   async delete(key: string): Promise<void> {

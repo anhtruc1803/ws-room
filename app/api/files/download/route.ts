@@ -42,31 +42,38 @@ export async function GET(request: NextRequest) {
     const filePath = local.getFilePath(key);
     const buffer = await readFile(filePath);
 
-    // Determine content type from key
-    const ext = key.split(".").pop()?.toLowerCase() || "";
-    const contentTypeMap: Record<string, string> = {
-      png: "image/png",
-      jpg: "image/jpeg",
-      jpeg: "image/jpeg",
-      gif: "image/gif",
-      webp: "image/webp",
-      pdf: "application/pdf",
-      json: "application/json",
-      txt: "text/plain",
-      log: "text/plain",
-      csv: "text/csv",
-      md: "text/markdown",
-      zip: "application/zip",
-      gz: "application/gzip",
-      doc: "application/msword",
-      docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-      xls: "application/vnd.ms-excel",
-      xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-    };
-    const contentType = contentTypeMap[ext] || "application/octet-stream";
+    // Use original filename and mimeType from query params (passed via signed URL)
+    const originalFilename = searchParams.get("filename");
+    const originalMime = searchParams.get("mime");
 
-    // Extract filename from key
-    const filename = key.split("/").pop() || "download";
+    // Determine content type: prefer query param, fallback to extension-based guess
+    let contentType = originalMime || "application/octet-stream";
+    if (!originalMime) {
+      const ext = key.split(".").pop()?.toLowerCase() || "";
+      const contentTypeMap: Record<string, string> = {
+        png: "image/png",
+        jpg: "image/jpeg",
+        jpeg: "image/jpeg",
+        gif: "image/gif",
+        webp: "image/webp",
+        pdf: "application/pdf",
+        json: "application/json",
+        txt: "text/plain",
+        log: "text/plain",
+        csv: "text/csv",
+        md: "text/markdown",
+        zip: "application/zip",
+        gz: "application/gzip",
+        doc: "application/msword",
+        docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        xls: "application/vnd.ms-excel",
+        xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      };
+      contentType = contentTypeMap[ext] || "application/octet-stream";
+    }
+
+    // Use original filename from query param, fallback to storage key basename
+    const filename = originalFilename || key.split("/").pop() || "download";
 
     return new NextResponse(buffer, {
       headers: {

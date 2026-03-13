@@ -150,7 +150,12 @@ export async function getFileDownloadUrl(
   }
 
   const storage = getStorage();
-  const signedUrl = await storage.getSignedUrl(attachment.storageKey, 300); // 5 min TTL
+  const signedUrl = await storage.getSignedUrl(
+    attachment.storageKey,
+    300, // 5 min TTL
+    attachment.filename,
+    attachment.mimeType
+  );
 
   // Audit log
   await prisma.auditLog.create({

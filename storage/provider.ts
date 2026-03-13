@@ -7,7 +7,7 @@ export interface StorageProvider {
   upload(key: string, buffer: Buffer, contentType: string): Promise<void>;
 
   /** Get a time-limited signed URL for downloading */
-  getSignedUrl(key: string, ttlSeconds: number): Promise<string>;
+  getSignedUrl(key: string, ttlSeconds: number, filename?: string, mimeType?: string): Promise<string>;
 
   /** Delete a single file */
   delete(key: string): Promise<void>;

@@ -45,10 +45,12 @@ export class S3StorageProvider implements StorageProvider {
     );
   }
 
-  async getSignedUrl(key: string, ttlSeconds: number): Promise<string> {
+  async getSignedUrl(key: string, ttlSeconds: number, filename?: string, mimeType?: string): Promise<string> {
     const command = new GetObjectCommand({
       Bucket: this.bucket,
       Key: key,
+      ...(filename && { ResponseContentDisposition: `attachment; filename="${filename}"` }),
+      ...(mimeType && { ResponseContentType: mimeType }),
     });
     return getSignedUrl(this.client, command, { expiresIn: ttlSeconds });
   }
